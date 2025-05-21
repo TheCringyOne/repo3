@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "nodemon backend/server.js",
 		"start": "node backend/server.js",
-		"build": "npm install && npm install --prefix frontend --include=dev && npx --prefix frontend vite build"
+		"build": "npm install && npm install --prefix frontend --include=dev && cd frontend && node ./node_modules/vite/bin/vite.js build"
 	},
 	"keywords": [],
 	"author": "",
