@@ -30,14 +30,21 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cookieParser());
 
-// Configuración CORS para desarrollo
-if (process.env.NODE_ENV !== "production") {
-    app.use(
-        cors({
-            origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
-            credentials: true,
-        })
-    );
+// Configuración CORS mejorada
+if (process.env.NODE_ENV === "production") {
+  // En producción, permitir el mismo origen y las cookies
+  app.use(cors({
+    origin: true, // Esto permitirá solicitudes desde el mismo origen
+    credentials: true
+  }));
+} else {
+  // Para desarrollo, usar la configuración específica
+  app.use(
+    cors({
+      origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+      credentials: true,
+    })
+  );
 }
 
 // Rutas de la API
@@ -53,34 +60,34 @@ app.use("/api/v1/jobs", jobPostRoutes);
 
 // Configuración para producción: Sirve los archivos estáticos del frontend
 if (process.env.NODE_ENV === "production") {
-    // Sirve archivos estáticos
-    app.use(express.static(path.join(__dirname, "../frontend/dist")));
-    
-    // Todas las rutas que no sean API redirigen al index.html
-    app.get("*", (req, res) => {
-        res.sendFile(path.resolve(__dirname, "..", "frontend", "dist", "index.html"));
-    });
+  // Sirve archivos estáticos
+  app.use(express.static(path.join(__dirname, "../frontend/dist")));
+  
+  // Todas las rutas que no sean API redirigen al index.html
+  app.get("*", (req, res) => {
+    res.sendFile(path.resolve(__dirname, "..", "frontend", "dist", "index.html"));
+  });
 } else {
-    // Ruta simple para verificar que el servidor está funcionando en desarrollo
-    app.get('/', (req, res) => {
-        res.send('API está funcionando correctamente');
-    });
+  // Ruta simple para verificar que el servidor está funcionando en desarrollo
+  app.get('/', (req, res) => {
+    res.send('API está funcionando correctamente');
+  });
 }
 
 // Configuración de tareas programadas
 if (process.env.NODE_ENV === "production") {
-    setInterval(async () => {
-        try {
-            await cleanupExpiredProjects();
-            console.log("Completed expired projects cleanup job");
-        } catch (error) {
-            console.error("Error in expired projects cleanup job:", error);
-        }
-    }, 24 * 60 * 60 * 1000); // Run every 24 hours
+  setInterval(async () => {
+    try {
+      await cleanupExpiredProjects();
+      console.log("Completed expired projects cleanup job");
+    } catch (error) {
+      console.error("Error in expired projects cleanup job:", error);
+    }
+  }, 24 * 60 * 60 * 1000); // Run every 24 hours
 }
 
 // Iniciar el servidor
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    connectDB();
+  console.log(`Server running on port ${PORT}`);
+  connectDB();
 });
