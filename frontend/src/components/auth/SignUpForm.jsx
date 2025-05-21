@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import { axiosInstance } from '../../lib/axios';
 
 const SignupForm = () => {
     const navigate = useNavigate();
@@ -68,10 +68,11 @@ const SignupForm = () => {
             
             const { confirmPassword, ...dataToSend } = formData;
             
-			const response = await axios.post('http://localhost:5000/api/v1/auth/signup', dataToSend);
+            // Usar axiosInstance en lugar de axios directo
+            const response = await axiosInstance.post('/auth/signup', dataToSend);
             
             toast.success(response.data.message || 'Registro exitoso');
-            navigate('/login');
+            navigate('/iniciar-sesion');
         } catch (error) {
             toast.error(error.response?.data?.message || 'Error al registrarse');
         } finally {
