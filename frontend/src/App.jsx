@@ -34,13 +34,14 @@ function PostRedirect() {
 function App() {
     const [showQuestionnaire, setShowQuestionnaire] = useState(false);
     
-    const { data: authUser, isLoading } = useQuery({
+    const { data: authUser, isLoading, error } = useQuery({
         queryKey: ["authUser"],
         queryFn: async () => {
             try {
                 const res = await axiosInstance.get("/auth/me");
                 return res.data;
             } catch (err) {
+                // Si hay un error 401 (no autorizado), retornamos null en lugar de lanzar un error
                 if (err.response && err.response.status === 401) {
                     return null;
                 }
@@ -49,7 +50,7 @@ function App() {
             }
         },
         retry: false,
-        refetchOnWindowFocus: true,
+        refetchOnWindowFocus: false, // Desactivar refetch automático para diagnosticar el problema
     });
     
     useEffect(() => {
@@ -68,9 +69,14 @@ function App() {
         );
     }
 
+    // Si hay un error, mostrarlo
+    if (error) {
+        console.error("Error al cargar el usuario:", error);
+    }
+
     return (
         <Layout>
-            {showQuestionnaire && (
+            {showQuestionnaire && authUser && (
                 <QuestionnaireModal
                     isOpen={showQuestionnaire}
                     onClose={() => setShowQuestionnaire(false)}
