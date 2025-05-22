@@ -16,6 +16,13 @@ const Post = ({ post }) => {
 	const [showComments, setShowComments] = useState(false);
 	const [newComment, setNewComment] = useState("");
 	const [comments, setComments] = useState(post.comments || []);
+	
+	// Verificar que el post y su autor existen
+	if (!post || !post.author) {
+		console.warn("Post or author is null/undefined:", post);
+		return null; // No renderizar el post si no tiene autor
+	}
+
 	const isOwner = authUser._id === post.author._id;
 	const isLiked = post.likes.includes(authUser._id);
 
@@ -92,19 +99,19 @@ const Post = ({ post }) => {
 			<div className='p-4'>
 				<div className='flex items-center justify-between mb-4'>
 					<div className='flex items-center'>
-						<CustomLink to={`/profile/${post?.author?.username}`}>
+						<CustomLink to={`/profile/${post.author.username || 'unknown'}`}>
 							<img
 								src={post.author.profilePicture || "/avatar.png"}
-								alt={post.author.name}
+								alt={post.author.name || "Usuario desconocido"}
 								className='size-10 rounded-full mr-3'
 							/>
 						</CustomLink>
 
 						<div>
-							<CustomLink to={`/profile/${post?.author?.username}`}>
-								<h3 className='font-semibold'>{post.author.name}</h3>
+							<CustomLink to={`/profile/${post.author.username || 'unknown'}`}>
+								<h3 className='font-semibold'>{post.author.name || "Usuario desconocido"}</h3>
 							</CustomLink>
-							<p className='text-xs text-info'>{post.author.headline}</p>
+							<p className='text-xs text-info'>{post.author.headline || "Sin descripción"}</p>
 							<p className='text-xs text-info'>
 								{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
 							</p>
@@ -130,7 +137,6 @@ const Post = ({ post }) => {
 						text={`Comentarios (${comments.length})`}
 						onClick={() => setShowComments(!showComments)}
 					/>
-					{/*<PostAction icon={<Share2 size={18} />} text='compartir' /> */}
 				</div>
 			</div>
 
@@ -140,13 +146,13 @@ const Post = ({ post }) => {
 						{comments.map((comment) => (
 							<div key={comment._id} className='mb-2 bg-base-100 p-2 rounded flex items-start'>
 								<img
-									src={comment.user.profilePicture || "/avatar.png"}
-									alt={comment.user.name}
+									src={comment.user?.profilePicture || "/avatar.png"}
+									alt={comment.user?.name || "Usuario"}
 									className='w-8 h-8 rounded-full mr-2 flex-shrink-0'
 								/>
 								<div className='flex-grow'>
 									<div className='flex items-center mb-1'>
-										<span className='font-semibold mr-2'>{comment.user.name}</span>
+										<span className='font-semibold mr-2'>{comment.user?.name || "Usuario desconocido"}</span>
 										<span className='text-xs text-info'>
 											{formatDistanceToNow(new Date(comment.createdAt))}
 										</span>
@@ -179,4 +185,5 @@ const Post = ({ post }) => {
 		</div>
 	);
 };
+
 export default Post;
