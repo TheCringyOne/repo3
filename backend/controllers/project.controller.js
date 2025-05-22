@@ -174,7 +174,7 @@ export const deleteProject = async (req, res) => {
         const project = await ProjectPost.findById(projectId);
         
         if (!project) {
-            return res.status(404).json({ message: "Project not found" });
+            return res.status(404).json({ message: "Proyecto no encontrado" });
         }
         
         // Permitir eliminar si es el autor del proyecto O si es administrador
@@ -187,16 +187,24 @@ export const deleteProject = async (req, res) => {
         
         // Delete image from cloudinary if it exists
         if (project.image) {
-            const publicId = project.image.split('/').pop().split('.')[0];
-            await cloudinary.uploader.destroy(publicId);
+            try {
+                const publicId = project.image.split('/').pop().split('.')[0];
+                await cloudinary.uploader.destroy(publicId);
+            } catch (cloudinaryError) {
+                console.error("Error deleting image from cloudinary:", cloudinaryError);
+                // Continue with project deletion even if image deletion fails
+            }
         }
+        
+        // Delete all notifications related to this project
+        await Notification.deleteMany({ relatedProject: projectId });
         
         await ProjectPost.findByIdAndDelete(projectId);
         
         res.status(200).json({ message: "Proyecto eliminado exitosamente" });
     } catch (error) {
         console.error("Error in deleteProject controller:", error);
-        res.status(500).json({ message: "Server error" });
+        res.status(500).json({ message: "Error del servidor" });
     }
 };
 
@@ -209,11 +217,11 @@ export const toggleInterestInProject = async (req, res) => {
         const project = await ProjectPost.findById(projectId);
         
         if (!project) {
-            return res.status(404).json({ message: "Project not found" });
+            return res.status(404).json({ message: "Proyecto no encontrado" });
         }
         
         if (project.status === "expired") {
-            return res.status(400).json({ message: "Cannot show interest in an expired project" });
+            return res.status(400).json({ message: "No puedes mostrar interés en un proyecto expirado" });
         }
         
         const isInterested = project.interestedUsers.some(
@@ -227,6 +235,7 @@ export const toggleInterestInProject = async (req, res) => {
         } else {
             project.interestedUsers.push({ user: userId });
             
+            // Create notification for project author if it's not the same user
             if (project.author.toString() !== userId.toString()) {
                 const notification = new Notification({
                     recipient: project.author,
@@ -246,7 +255,7 @@ export const toggleInterestInProject = async (req, res) => {
         });
     } catch (error) {
         console.error("Error in toggleInterestInProject controller:", error);
-        res.status(500).json({ message: "Server error" });
+        res.status(500).json({ message: "Error del servidor" });
     }
 };
 
@@ -257,17 +266,17 @@ export const addCommentToProject = async (req, res) => {
         const { content } = req.body;
         
         if (!content) {
-            return res.status(400).json({ message: "Comment content is required" });
+            return res.status(400).json({ message: "El contenido del comentario es requerido" });
         }
         
         const project = await ProjectPost.findById(projectId);
         
         if (!project) {
-            return res.status(404).json({ message: "Project not found" });
+            return res.status(404).json({ message: "Proyecto no encontrado" });
         }
         
         if (project.status === "expired") {
-            return res.status(400).json({ message: "Cannot comment on an expired project" });
+            return res.status(400).json({ message: "No puedes comentar en un proyecto expirado" });
         }
         
         project.comments.push({
@@ -277,7 +286,7 @@ export const addCommentToProject = async (req, res) => {
         
         await project.save();
         
-        // Create notification for project author
+        // Create notification for project author if it's not the same user
         if (project.author.toString() !== req.user._id.toString()) {
             const notification = new Notification({
                 recipient: project.author,
@@ -292,7 +301,7 @@ export const addCommentToProject = async (req, res) => {
         res.status(200).json(project.toObject());
     } catch (error) {
         console.error("Error in addCommentToProject controller:", error);
-        res.status(500).json({ message: "Server error" });
+        res.status(500).json({ message: "Error del servidor" });
     }
 };
 
@@ -305,11 +314,11 @@ export const likeProject = async (req, res) => {
         const project = await ProjectPost.findById(projectId);
         
         if (!project) {
-            return res.status(404).json({ message: "Project not found" });
+            return res.status(404).json({ message: "Proyecto no encontrado" });
         }
         
         if (project.status === "expired") {
-            return res.status(400).json({ message: "Cannot like an expired project" });
+            return res.status(400).json({ message: "No puedes dar like a un proyecto expirado" });
         }
         
         const isLiked = project.likes.includes(userId);
@@ -319,6 +328,7 @@ export const likeProject = async (req, res) => {
         } else {
             project.likes.push(userId);
             
+            // Create notification for project author if it's not the same user
             if (project.author.toString() !== userId.toString()) {
                 const notification = new Notification({
                     recipient: project.author,
@@ -336,6 +346,6 @@ export const likeProject = async (req, res) => {
         res.status(200).json(project.toObject());
     } catch (error) {
         console.error("Error in likeProject controller:", error);
-        res.status(500).json({ message: "Server error" });
+        res.status(500).json({ message: "Error del servidor" });
     }
 };
