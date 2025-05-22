@@ -159,6 +159,9 @@ const SignupForm = () => {
                     required
                     minLength={6}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                    Las contraseñas deben tener al menos 6 caracteres de largo
+                </p>
             </div>
             
             <div>
