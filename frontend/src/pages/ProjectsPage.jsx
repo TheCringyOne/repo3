@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { axiosInstance } from "../lib/axios";
 import Sidebar from "../components/Sidebar";
 import ProjectCreation from "../components/ProjectCreation";
-import { Briefcase, Plus, Loader, ThumbsUp, MessageSquare, UserPlus, Users, X } from "lucide-react";
+import { Briefcase, Plus, Loader, ThumbsUp, MessageSquare, UserPlus, Users, X, Trash2, Shield } from "lucide-react";
 import toast from 'react-hot-toast';
 import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -61,25 +61,38 @@ const ProjectsPage = () => {
     });
 
     // Show interest mutation
-  // In the toggleInterest mutation, change the success message to use Spanish
-const { mutate: toggleInterest } = useMutation({
-    mutationFn: async (projectId) => {
-        const res = await axiosInstance.post(`/projects/${projectId}/interest`);
-        return res.data;
-    },
-    onSuccess: (data) => {
-        queryClient.invalidateQueries(["projects", filters]);
-        // Custom Spanish message instead of using the response message
-        const message = data.message.includes("removed") ? 
-            "Interés removido" : "Interés añadido";
-        toast.success(message);
-    },
-    onError: (error) => {
-        toast.error(error.response?.data?.message || "Error al mostrar interés");
-    }
-});
+    const { mutate: toggleInterest } = useMutation({
+        mutationFn: async (projectId) => {
+            const res = await axiosInstance.post(`/projects/${projectId}/interest`);
+            return res.data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(["projects", filters]);
+            // Custom Spanish message instead of using the response message
+            const message = data.message.includes("removed") ? 
+                "Interés removido" : "Interés añadido";
+            toast.success(message);
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.message || "Error al mostrar interés");
+        }
+    });
+
+    // Delete project mutation
+    const { mutate: deleteProject, isPending: isDeletingProject } = useMutation({
+        mutationFn: async (projectId) => {
+            await axiosInstance.delete(`/projects/${projectId}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(["projects", filters]);
+            toast.success("Proyecto eliminado exitosamente");
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.message || "Error al eliminar el proyecto");
+        }
+    });
     
-    // ProjectPost component with like, comment, and show interest functionality
+    // ProjectPost component with like, comment, show interest, and delete functionality
     const ProjectPost = ({ project, isOwner }) => {
         const [showCommentForm, setShowCommentForm] = useState(false);
         const [commentText, setCommentText] = useState('');
@@ -87,6 +100,10 @@ const { mutate: toggleInterest } = useMutation({
         
         const isLiked = project.likes?.includes(authUser._id);
         const isInterested = project.interestedUsers?.some(u => u.user._id === authUser._id);
+        const isAdmin = authUser.role === 'administrador';
+        
+        // Puede eliminar si es el dueño del proyecto O si es administrador
+        const canDelete = isOwner || isAdmin;
         
         const handleLike = () => {
             likeProject(project._id);
@@ -94,6 +111,18 @@ const { mutate: toggleInterest } = useMutation({
         
         const handleToggleInterest = () => {
             toggleInterest(project._id);
+        };
+
+        const handleDeleteProject = () => {
+            let confirmMessage = "¿Estás seguro de que quieres eliminar este proyecto?";
+            
+            // Si es admin pero no es el dueño, mostrar mensaje especial
+            if (isAdmin && !isOwner) {
+                confirmMessage = `¿Estás seguro de que quieres eliminar este proyecto de ${project.author.name}? Esta acción no se puede deshacer.`;
+            }
+            
+            if (!window.confirm(confirmMessage)) return;
+            deleteProject(project._id);
         };
         
         const { mutate: addComment } = useMutation({
@@ -145,11 +174,32 @@ const { mutate: toggleInterest } = useMutation({
                         </div>
                     </div>
                     <div className="flex flex-col items-end">
-                        {isOwner && (
-                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mb-2">
-                                Tu proyecto
-                            </span>
-                        )}
+                        <div className="flex items-center mb-2">
+                            {isOwner && (
+                                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-2">
+                                    Tu proyecto
+                                </span>
+                            )}
+                            {canDelete && (
+                                <div className="flex items-center">
+                                    {/* Mostrar icono de escudo si es admin eliminando proyecto de otro usuario */}
+                                    {isAdmin && !isOwner && (
+                                        <div className="flex items-center mr-2 text-purple-600" title="Eliminación como administrador">
+                                            <Shield size={14} className="mr-1" />
+                                            <span className="text-xs">Admin</span>
+                                        </div>
+                                    )}
+                                    <button 
+                                        onClick={handleDeleteProject}
+                                        className='text-red-500 hover:text-red-700'
+                                        title={isAdmin && !isOwner ? "Eliminar proyecto como administrador" : "Eliminar tu proyecto"}
+                                        disabled={isDeletingProject}
+                                    >
+                                        {isDeletingProject ? <Loader size={16} className='animate-spin' /> : <Trash2 size={16} />}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                         <span className={`text-xs px-2 py-1 rounded-full ${
                             project.status === 'active' ? 'bg-green-100 text-green-800' :
                             project.status === 'completed' ? 'bg-purple-100 text-purple-800' :
