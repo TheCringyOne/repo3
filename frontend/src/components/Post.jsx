@@ -3,7 +3,7 @@ import { useState } from "react";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
 import { useParams } from "react-router-dom";
-import { Loader, MessageCircle, Send, Share2, ThumbsUp, Trash2, SquareChevronUp, } from "lucide-react";
+import { Loader, MessageCircle, Send, Share2, ThumbsUp, Trash2, SquareChevronUp, Shield } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import CustomLink from "./CustomLink";
 
@@ -24,7 +24,11 @@ const Post = ({ post }) => {
 	}
 
 	const isOwner = authUser._id === post.author._id;
+	const isAdmin = authUser.role === 'administrador';
 	const isLiked = post.likes.includes(authUser._id);
+	
+	// Puede eliminar si es el dueño del post O si es administrador
+	const canDelete = isOwner || isAdmin;
 
 	const queryClient = useQueryClient();
 
@@ -34,10 +38,10 @@ const Post = ({ post }) => {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["posts"] });
-			toast.success("Post borrado");
+			toast.success("Post eliminado exitosamente");
 		},
 		onError: (error) => {
-			toast.error(error.message);
+			toast.error(error.response?.data?.message || error.message);
 		},
 	});
 
@@ -65,7 +69,14 @@ const Post = ({ post }) => {
 	});
 
 	const handleDeletePost = () => {
-		if (!window.confirm("¿Estas seguro de que quieres borrar este post?")) return;
+		let confirmMessage = "¿Estás seguro de que quieres borrar este post?";
+		
+		// Si es admin pero no es el dueño, mostrar mensaje especial
+		if (isAdmin && !isOwner) {
+			confirmMessage = `¿Estás seguro de que quieres eliminar este post de ${post.author.name}? Esta acción no se puede deshacer.`;
+		}
+		
+		if (!window.confirm(confirmMessage)) return;
 		deletePost();
 	};
 
@@ -117,10 +128,23 @@ const Post = ({ post }) => {
 							</p>
 						</div>
 					</div>
-					{isOwner && (
-						<button onClick={handleDeletePost} className='text-red-500 hover:text-red-700'>
-							{isDeletingPost ? <Loader size={18} className='animate-spin' /> : <Trash2 size={18} />}
-						</button>
+					{canDelete && (
+						<div className="flex items-center">
+							{/* Mostrar icono de escudo si es admin eliminando post de otro usuario */}
+							{isAdmin && !isOwner && (
+								<div className="flex items-center mr-2 text-purple-600" title="Eliminación como administrador">
+									<Shield size={16} className="mr-1" />
+									<span className="text-xs">Admin</span>
+								</div>
+							)}
+							<button 
+								onClick={handleDeletePost} 
+								className='text-red-500 hover:text-red-700'
+								title={isAdmin && !isOwner ? "Eliminar post como administrador" : "Eliminar tu post"}
+							>
+								{isDeletingPost ? <Loader size={18} className='animate-spin' /> : <Trash2 size={18} />}
+							</button>
+						</div>
 					)}
 				</div>
 				<p className='mb-4'>{post.content}</p>
