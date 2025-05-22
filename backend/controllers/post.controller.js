@@ -5,10 +5,22 @@ import { sendCommentNotificationEmail } from "../emails/emailHandlers.js";
 
 export const getFeedPosts = async (req, res) => {
 	try {
-		const posts = await Post.find({ author: { $in: [...req.user.connections, req.user._id] } })
-			.populate("author", "name username profilePicture headline")
-			.populate("comments.user", "name profilePicture")
-			.sort({ createdAt: -1 });
+		const { connectionsOnly } = req.query;
+		let posts;
+		
+		// Si el usuario es administrador y no especifica connectionsOnly, mostrar todos los posts
+		if (req.user.role === 'administrador' && connectionsOnly !== 'true') {
+			posts = await Post.find({})
+				.populate("author", "name username profilePicture headline")
+				.populate("comments.user", "name profilePicture")
+				.sort({ createdAt: -1 });
+		} else {
+			// Para otros roles o cuando admin quiere ver solo conexiones
+			posts = await Post.find({ author: { $in: [...req.user.connections, req.user._id] } })
+				.populate("author", "name username profilePicture headline")
+				.populate("comments.user", "name profilePicture")
+				.sort({ createdAt: -1 });
+		}
 
 		res.status(200).json(posts);
 	} catch (error) {
