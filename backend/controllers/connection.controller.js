@@ -52,6 +52,13 @@ export const acceptConnectionRequest = async (req, res) => {
 			return res.status(404).json({ message: "Connection request not found" });
 		}
 
+		// Verificar que el sender existe
+		if (!request.sender) {
+			// Si el sender no existe, eliminar la solicitud
+			await ConnectionRequest.findByIdAndDelete(requestId);
+			return res.status(404).json({ message: "El usuario que envió la solicitud ya no existe" });
+		}
+
 		// check if the req is for the current user
 		if (request.recipient._id.toString() !== userId.toString()) {
 			return res.status(403).json({ message: "Sin autorización para aceptar esta conexión" });
@@ -101,6 +108,10 @@ export const rejectConnectionRequest = async (req, res) => {
 
 		const request = await ConnectionRequest.findById(requestId);
 
+		if (!request) {
+			return res.status(404).json({ message: "Connection request not found" });
+		}
+
 		if (request.recipient.toString() !== userId.toString()) {
 			return res.status(403).json({ message: "Not authorized to reject this request" });
 		}
@@ -128,7 +139,19 @@ export const getConnectionRequests = async (req, res) => {
 			"name username profilePicture headline connections"
 		);
 
-		res.json(requests);
+		// Filtrar solicitudes que tengan sender válido
+		const validRequests = requests.filter(request => request.sender !== null && request.sender !== undefined);
+		
+		// Eliminar solicitudes huérfanas de la base de datos
+		const orphanRequests = requests.filter(request => request.sender === null || request.sender === undefined);
+		
+		if (orphanRequests.length > 0) {
+			console.log(`Found ${orphanRequests.length} orphan connection requests, cleaning up...`);
+			const orphanIds = orphanRequests.map(req => req._id);
+			await ConnectionRequest.deleteMany({ _id: { $in: orphanIds } });
+		}
+
+		res.json(validRequests);
 	} catch (error) {
 		console.error("Error in getConnectionRequests controller:", error);
 		res.status(500).json({ message: "Server error" });
@@ -144,7 +167,17 @@ export const getUserConnections = async (req, res) => {
 			"name username profilePicture headline connections"
 		);
 
-		res.json(user.connections);
+		// Filtrar conexiones válidas
+		const validConnections = user.connections.filter(connection => connection !== null && connection !== undefined);
+		
+		// Si hay conexiones inválidas, limpiar del usuario
+		if (user.connections.length !== validConnections.length) {
+			console.log(`Found invalid connections for user ${userId}, cleaning up...`);
+			const validConnectionIds = validConnections.map(conn => conn._id);
+			await User.findByIdAndUpdate(userId, { connections: validConnectionIds });
+		}
+
+		res.json(validConnections);
 	} catch (error) {
 		console.error("Error en el controlador getUserConnections:", error);
 		res.status(500).json({ message: "Server error" });
