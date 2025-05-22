@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { axiosInstance } from '../../lib/axios';
+import axios from 'axios';
 
 const SignupForm = () => {
     const navigate = useNavigate();
@@ -9,7 +9,7 @@ const SignupForm = () => {
         name: '',
         username: '',
         email: '',
-        studentId: '',
+        studentId: '', // New field
         password: '',
         confirmPassword: ''
     });
@@ -34,12 +34,6 @@ const SignupForm = () => {
                     studentId: value,
                 });
             }
-        } else if (name === 'username') {
-            // Limpiar espacios al inicio y final del username mientras el usuario escribe
-            setFormData({
-                ...formData,
-                username: value.trim()
-            });
         } else {
             setFormData({
                 ...formData,
@@ -69,23 +63,15 @@ const SignupForm = () => {
             return;
         }
         
-        // Validar que el username no tenga espacios adicionales
-        if (formData.username !== formData.username.trim()) {
-            toast.error('El nombre de usuario no puede tener espacios al inicio o final');
-            return;
-        }
-        
         try {
             setLoading(true);
             
             const { confirmPassword, ...dataToSend } = formData;
-            // Asegurar que el username esté limpio antes de enviar
-            dataToSend.username = dataToSend.username.trim();
             
-            const response = await axiosInstance.post('/auth/signup', dataToSend);
+			const response = await axios.post('http://localhost:5000/api/v1/auth/signup', dataToSend);
             
             toast.success(response.data.message || 'Registro exitoso');
-            navigate('/iniciar-sesion');
+            navigate('/login');
         } catch (error) {
             toast.error(error.response?.data?.message || 'Error al registrarse');
         } finally {
@@ -95,6 +81,7 @@ const SignupForm = () => {
     
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Existing name and username fields */}
             <div>
                 <label className="label">Nombre completo</label>
                 <input
@@ -115,11 +102,11 @@ const SignupForm = () => {
                     value={formData.username}
                     onChange={handleChange}
                     className="input input-bordered w-full"
-                    placeholder="Sin espacios al inicio o final"
                     required
                 />
             </div>
             
+            {/* New student ID field */}
             <div>
                 <label className="label">ID de Estudiante (8 dígitos)</label>
                 <input
@@ -133,6 +120,7 @@ const SignupForm = () => {
                 />
             </div>
             
+            {/* Auto-generated email field (read-only) */}
             <div>
                 <label className="label">Correo Institucional</label>
                 <input
@@ -148,6 +136,7 @@ const SignupForm = () => {
                 </p>
             </div>
             
+            {/* Password fields */}
             <div>
                 <label className="label">Contraseña</label>
                 <input
