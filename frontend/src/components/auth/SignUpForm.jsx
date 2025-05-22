@@ -164,7 +164,7 @@ const SignupForm = () => {
                     value={formData.studentId}
                     onChange={handleChange}
                     className="input input-bordered w-full"
-                    placeholder="Ejemplo: 20270806"
+                    placeholder="Ejemplo: 23400105"
                     required
                 />
             </div>
