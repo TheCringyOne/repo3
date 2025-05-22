@@ -137,6 +137,7 @@ export const updateProject = async (req, res) => {
             return res.status(404).json({ message: "Project not found" });
         }
         
+        // Only the author can update the project
         if (project.author.toString() !== req.user._id.toString()) {
             return res.status(403).json({ message: "Not authorized to update this project" });
         }
@@ -167,6 +168,8 @@ export const updateProject = async (req, res) => {
 export const deleteProject = async (req, res) => {
     try {
         const projectId = req.params.id;
+        const userId = req.user._id;
+        const userRole = req.user.role;
         
         const project = await ProjectPost.findById(projectId);
         
@@ -174,10 +177,15 @@ export const deleteProject = async (req, res) => {
             return res.status(404).json({ message: "Project not found" });
         }
         
-        if (project.author.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ message: "Not authorized to delete this project" });
+        // Permitir eliminar si es el autor del proyecto O si es administrador
+        const isAuthor = project.author.toString() === userId.toString();
+        const isAdmin = userRole === 'administrador';
+        
+        if (!isAuthor && !isAdmin) {
+            return res.status(403).json({ message: "No estás autorizado para eliminar este proyecto" });
         }
         
+        // Delete image from cloudinary if it exists
         if (project.image) {
             const publicId = project.image.split('/').pop().split('.')[0];
             await cloudinary.uploader.destroy(publicId);
@@ -185,7 +193,7 @@ export const deleteProject = async (req, res) => {
         
         await ProjectPost.findByIdAndDelete(projectId);
         
-        res.status(200).json({ message: "Project deleted successfully" });
+        res.status(200).json({ message: "Proyecto eliminado exitosamente" });
     } catch (error) {
         console.error("Error in deleteProject controller:", error);
         res.status(500).json({ message: "Server error" });
