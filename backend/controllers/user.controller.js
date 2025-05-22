@@ -40,70 +40,16 @@ export const getSuggestedConnectionsBig = async (req, res) => {
 };
 
 export const getPublicProfile = async (req, res) => {
-    try {
-        const { username } = req.params;
-        
-        // Verificar que el username no esté vacío
-        if (!username || username.trim() === '') {
-            return res.status(400).json({ message: "Username is required" });
-        }
-        
-        // Limpiar el username de espacios y buscar tanto con espacios como sin espacios
-        const cleanUsername = username.trim();
-        
-        // Buscar el usuario por username, probando diferentes variaciones
-        let user = await User.findOne({ 
-            username: { $regex: new RegExp(`^${cleanUsername}$`, 'i') }
-        }).select("-password");
-        
-        // Si no se encuentra, intentar con espacios al final
-        if (!user) {
-            user = await User.findOne({ 
-                username: { $regex: new RegExp(`^${cleanUsername}\\s*$`, 'i') }
-            }).select("-password");
-        }
-        
-        // Si aún no se encuentra, intentar buscar por coincidencia parcial
-        if (!user) {
-            user = await User.findOne({ 
-                username: { $regex: new RegExp(cleanUsername, 'i') }
-            }).select("-password");
-        }
-        
-        if (!user) {
-            console.log(`User not found with username: "${username}"`);
-            return res.status(404).json({ message: "User not found" });
-        }
-        
-        // Verificar que el usuario tenga todos los campos necesarios
-        const userResponse = {
-            _id: user._id,
-            name: user.name || '',
-            username: user.username || '',
-            email: user.email || '',
-            role: user.role || 'egresado',
-            profilePicture: user.profilePicture || '',
-            bannerImg: user.bannerImg || '',
-            curriculumImg: user.curriculumImg || '',
-            headline: user.headline || 'Egresado',
-            location: user.location || 'México',
-            about: user.about || '',
-            skills: user.skills || [],
-            experience: user.experience || [],
-            education: user.education || [],
-            connections: user.connections || [],
-            companyInfo: user.companyInfo || {},
-            studentId: user.studentId,
-            isFirstLogin: user.isFirstLogin,
-            createdAt: user.createdAt,
-            updatedAt: user.updatedAt
-        };
-        
-        res.json(userResponse);
-    } catch (error) {
-        console.error("Error in getPublicProfile controller:", error);
-        res.status(500).json({ message: "Server error" });
-    }
+   try {
+       const user = await User.findOne({ username: req.params.username }).select("-password");
+       if (!user) {
+           return res.status(404).json({ message: "User not found" });
+       }
+       res.json(user);
+   } catch (error) {
+       console.error("Error in getPublicProfile controller:", error);
+       res.status(500).json({ message: "Server error" });
+   }
 };
 
 export const updateProfile = async (req, res) => {
@@ -120,18 +66,13 @@ export const updateProfile = async (req, res) => {
            "skills",
            "experience",
            "education",
-           "companyInfo",
+           "companyInfo", // Added companyInfo to allowed fields
        ];
        
        const updatedData = {};
        for (const field of allowedFields) {
-           if (req.body[field] !== undefined) {
-               // Limpiar espacios del username si se está actualizando
-               if (field === 'username' && req.body[field]) {
-                   updatedData[field] = req.body[field].trim();
-               } else {
-                   updatedData[field] = req.body[field];
-               }
+           if (req.body[field] !== undefined) { // Changed from req.body[field] to handle empty objects
+               updatedData[field] = req.body[field];
            }
        }
 
@@ -186,16 +127,20 @@ export const updateProfile = async (req, res) => {
    }
 };
 
+// Función para trabahar con los empresarios y su primer login  ↓
 export const completeFirstLoginSetup = async (req, res) => {
    try {
        const userId = req.user._id;
        
+       // Check if user is empresario
        if (req.user.role !== 'empresario') {
            return res.status(403).json({ message: "Esta acción solo está permitida para usuarios con rol de empresario" });
        }
        
+       // Get company info from request
        const { companyInfo } = req.body;
        
+       // Update user with companyInfo and set isFirstLogin to false
        const user = await User.findByIdAndUpdate(
            userId, 
            { 
