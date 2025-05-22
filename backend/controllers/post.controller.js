@@ -22,7 +22,15 @@ export const getFeedPosts = async (req, res) => {
 				.sort({ createdAt: -1 });
 		}
 
-		res.status(200).json(posts);
+		// Filtrar posts que tengan autor válido
+		const validPosts = posts.filter(post => post.author !== null && post.author !== undefined);
+		
+		// Log para debugging
+		if (posts.length !== validPosts.length) {
+			console.log(`Filtered out ${posts.length - validPosts.length} posts with invalid authors`);
+		}
+
+		res.status(200).json(validPosts);
 	} catch (error) {
 		console.error("Error in getFeedPosts controller:", error);
 		res.status(500).json({ message: "Server error" });
@@ -94,6 +102,15 @@ export const getPostById = async (req, res) => {
 			.populate("author", "name username profilePicture headline")
 			.populate("comments.user", "name profilePicture username headline");
 
+		if (!post) {
+			return res.status(404).json({ message: "Post not found" });
+		}
+
+		// Verificar que el autor existe
+		if (!post.author) {
+			return res.status(404).json({ message: "Post author not found" });
+		}
+
 		res.status(200).json(post);
 	} catch (error) {
 		console.error("Error in getPostById controller:", error);
@@ -113,6 +130,11 @@ export const createComment = async (req, res) => {
 			},
 			{ new: true }
 		).populate("author", "name email username headline profilePicture");
+
+		// Verificar que el post y su autor existen
+		if (!post || !post.author) {
+			return res.status(404).json({ message: "Post or author not found" });
+		}
 
 		// create a notification if the comment owner is not the post owner
 		if (post.author._id.toString() !== req.user._id.toString()) {
@@ -152,6 +174,10 @@ export const likePost = async (req, res) => {
 		const post = await Post.findById(postId);
 		const userId = req.user._id;
 
+		if (!post) {
+			return res.status(404).json({ message: "Post not found" });
+		}
+
 		if (post.likes.includes(userId)) {
 			// unlike the post
 			post.likes = post.likes.filter((id) => id.toString() !== userId.toString());
@@ -159,7 +185,7 @@ export const likePost = async (req, res) => {
 			// like the post
 			post.likes.push(userId);
 			// create a notification if the post owner is not the user who liked
-			if (post.author.toString() !== userId.toString()) {
+			if (post.author && post.author.toString() !== userId.toString()) {
 				const newNotification = new Notification({
 					recipient: post.author,
 					type: "like",
