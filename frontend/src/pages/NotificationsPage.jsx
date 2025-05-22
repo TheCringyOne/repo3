@@ -61,12 +61,17 @@ const NotificationsPage = () => {
   };
 
   const renderNotificationContent = (notification) => {
+    // Verificar que relatedUser existe
+    if (!notification.relatedUser) {
+      return <span>Notificación de usuario eliminado</span>;
+    }
+
     switch (notification.type) {
       case "like":
         return (
           <span>
-            <Link to={`/profile/${notification.relatedUser.username}`} className='font-bold'>
-              {notification.relatedUser.name}
+            <Link to={`/profile/${notification.relatedUser.username || 'unknown'}`} className='font-bold'>
+              {notification.relatedUser.name || "Usuario desconocido"}
             </Link>{" "}
             dio me gusta a tu post
           </span>
@@ -74,8 +79,8 @@ const NotificationsPage = () => {
       case "comment":
         return (
           <span>
-            <Link to={`/profile/${notification.relatedUser.username}`} className='font-bold'>
-              {notification.relatedUser.name}
+            <Link to={`/profile/${notification.relatedUser.username || 'unknown'}`} className='font-bold'>
+              {notification.relatedUser.name || "Usuario desconocido"}
             </Link>{" "}
             comentó en tu post
           </span>
@@ -83,8 +88,8 @@ const NotificationsPage = () => {
       case "connectionAccepted":
         return (
           <span>
-            <Link to={`/profile/${notification.relatedUser.username}`} className='font-bold'>
-              {notification.relatedUser.name}
+            <Link to={`/profile/${notification.relatedUser.username || 'unknown'}`} className='font-bold'>
+              {notification.relatedUser.name || "Usuario desconocido"}
             </Link>{" "}
             aceptó tu solicitud de conexión
           </span>
@@ -92,8 +97,8 @@ const NotificationsPage = () => {
       case "projectInterest":
         return (
           <span>
-            <Link to={`/profile/${notification.relatedUser.username}`} className='font-bold'>
-              {notification.relatedUser.name}
+            <Link to={`/profile/${notification.relatedUser.username || 'unknown'}`} className='font-bold'>
+              {notification.relatedUser.name || "Usuario desconocido"}
             </Link>{" "}
             mostró interés en tu proyecto
           </span>
@@ -101,8 +106,8 @@ const NotificationsPage = () => {
       case "projectComment":
         return (
           <span>
-            <Link to={`/profile/${notification.relatedUser.username}`} className='font-bold'>
-              {notification.relatedUser.name}
+            <Link to={`/profile/${notification.relatedUser.username || 'unknown'}`} className='font-bold'>
+              {notification.relatedUser.name || "Usuario desconocido"}
             </Link>{" "}
             comentó en tu proyecto
           </span>
@@ -110,8 +115,8 @@ const NotificationsPage = () => {
       case "projectLike":
         return (
           <span>
-            <Link to={`/profile/${notification.relatedUser.username}`} className='font-bold'>
-              {notification.relatedUser.name}
+            <Link to={`/profile/${notification.relatedUser.username || 'unknown'}`} className='font-bold'>
+              {notification.relatedUser.name || "Usuario desconocido"}
             </Link>{" "}
             le dio me gusta a tu proyecto
           </span>
@@ -123,7 +128,7 @@ const NotificationsPage = () => {
           </span>
         );
       default:
-        return null;
+        return <span>Notificación</span>;
     }
   };
 
@@ -132,7 +137,7 @@ const NotificationsPage = () => {
     if (notification.relatedProject) {
       return (
         <Link
-          to={`/projects`} // Link to projects page since there's no single project view
+          to={`/projects`}
           className='mt-2 p-2 bg-gray-50 rounded-md flex items-center space-x-2 hover:bg-gray-100 transition-colors'
         >
           <Briefcase size={16} className='text-gray-500' />
@@ -163,6 +168,11 @@ const NotificationsPage = () => {
     );
   };
 
+  // Filtrar notificaciones válidas en el frontend también
+  const validNotifications = notifications?.data?.filter(notification => 
+    notification && notification.relatedUser
+  ) || [];
+
   return (
     <div className='grid grid-cols-1 lg:grid-cols-4 gap-6'>
       <div className='col-span-1 lg:col-span-1'>
@@ -173,10 +183,12 @@ const NotificationsPage = () => {
           <h1 className='text-2xl font-bold mb-6'>Notificaciones</h1>
 
           {isLoading ? (
-            <p>Cargando notificaciones...</p>
-          ) : notifications && notifications.data.length > 0 ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : validNotifications.length > 0 ? (
             <ul>
-              {notifications.data.map((notification) => (
+              {validNotifications.map((notification) => (
                 <li
                   key={notification._id}
                   className={`bg-white border rounded-lg p-4 my-4 transition-all hover:shadow-md ${
@@ -186,10 +198,10 @@ const NotificationsPage = () => {
                   <div className='flex items-start justify-between'>
                     <div className='flex items-center space-x-4'>
                       {notification.relatedUser && (
-                        <Link to={`/profile/${notification.relatedUser.username}`}>
+                        <Link to={`/profile/${notification.relatedUser.username || 'unknown'}`}>
                           <img
                             src={notification.relatedUser.profilePicture || "/avatar.png"}
-                            alt={notification.relatedUser.name}
+                            alt={notification.relatedUser.name || "Usuario"}
                             className='w-12 h-12 rounded-full object-cover'
                           />
                         </Link>
@@ -235,11 +247,14 @@ const NotificationsPage = () => {
               ))}
             </ul>
           ) : (
-            <p>No hay notificaciones por el momento</p>
+            <div className="text-center py-8">
+              <p className="text-gray-500">No hay notificaciones por el momento</p>
+            </div>
           )}
         </div>
       </div>
     </div>
   );
 };
+
 export default NotificationsPage;
