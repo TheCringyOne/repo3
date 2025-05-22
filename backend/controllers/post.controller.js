@@ -69,6 +69,7 @@ export const deletePost = async (req, res) => {
 	try {
 		const postId = req.params.id;
 		const userId = req.user._id;
+		const userRole = req.user.role;
 
 		const post = await Post.findById(postId);
 
@@ -76,9 +77,12 @@ export const deletePost = async (req, res) => {
 			return res.status(404).json({ message: "Post not found" });
 		}
 
-		// check if the current user is the author of the post
-		if (post.author.toString() !== userId.toString()) {
-			return res.status(403).json({ message: "You are not authorized to delete this post" });
+		// Permitir eliminar si es el autor del post O si es administrador
+		const isAuthor = post.author.toString() === userId.toString();
+		const isAdmin = userRole === 'administrador';
+
+		if (!isAuthor && !isAdmin) {
+			return res.status(403).json({ message: "No estás autorizado para eliminar este post" });
 		}
 
 		// delete the image from cloudinary as well!
@@ -88,7 +92,7 @@ export const deletePost = async (req, res) => {
 
 		await Post.findByIdAndDelete(postId);
 
-		res.status(200).json({ message: "Post borrado" });
+		res.status(200).json({ message: "Post eliminado exitosamente" });
 	} catch (error) {
 		console.log("Error in delete post controller", error.message);
 		res.status(500).json({ message: "Server error" });
