@@ -15,6 +15,8 @@ const SignupForm = () => {
     });
     
     const [loading, setLoading] = useState(false);
+    const [passwordError, setPasswordError] = useState('');
+    const [confirmPasswordError, setConfirmPasswordError] = useState('');
     
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -28,7 +30,35 @@ const SignupForm = () => {
                     studentId: value,
                     email: generatedEmail
                 });
+            } else if (name === 'password') {
+            setFormData({
+                ...formData,
+                [name]: value
+            });
+            // Validar contraseña en tiempo real
+            if (value.length > 0 && value.length < 6) {
+                setPasswordError('La contraseña debe tener al menos 6 caracteres');
             } else {
+                setPasswordError('');
+            }
+            // Si hay confirmación de contraseña, validar que coincidan
+            if (formData.confirmPassword && formData.confirmPassword !== value) {
+                setConfirmPasswordError('Las contraseñas no coinciden');
+            } else if (formData.confirmPassword) {
+                setConfirmPasswordError('');
+            }
+        } else if (name === 'confirmPassword') {
+            setFormData({
+                ...formData,
+                [name]: value
+            });
+            // Validar que las contraseñas coincidan
+            if (value !== formData.password) {
+                setConfirmPasswordError('Las contraseñas no coinciden');
+            } else {
+                setConfirmPasswordError('');
+            }
+        } else {
                 setFormData({
                     ...formData,
                     studentId: value,
@@ -53,6 +83,12 @@ const SignupForm = () => {
         
         if (formData.password !== formData.confirmPassword) {
             toast.error('Las contraseñas no coinciden');
+            return;
+        }
+        
+        // Validar longitud de contraseña
+        if (formData.password.length < 6) {
+            toast.error('La contraseña debe tener al menos 6 caracteres');
             return;
         }
         
@@ -155,13 +191,17 @@ const SignupForm = () => {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    className="input input-bordered w-full"
+                    className={`input input-bordered w-full ${passwordError ? 'border-red-500' : ''}`}
                     required
-                    minLength={6}
                 />
                 <p className="text-xs text-gray-500 mt-1">
                     Las contraseñas deben tener al menos 6 caracteres de largo
                 </p>
+                {passwordError && (
+                    <p className="text-xs text-red-500 mt-1">
+                        {passwordError}
+                    </p>
+                )}
             </div>
             
             <div>
@@ -171,16 +211,20 @@ const SignupForm = () => {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className="input input-bordered w-full"
+                    className={`input input-bordered w-full ${confirmPasswordError ? 'border-red-500' : ''}`}
                     required
-                    minLength={6}
                 />
+                {confirmPasswordError && (
+                    <p className="text-xs text-red-500 mt-1">
+                        {confirmPasswordError}
+                    </p>
+                )}
             </div>
             
             <button 
                 type="submit" 
                 className="btn btn-primary w-full"
-                disabled={loading}
+                disabled={loading || passwordError || confirmPasswordError || formData.password.length < 6}
             >
                 {loading ? 'Registrando...' : 'Registrarse'}
             </button>
