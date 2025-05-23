@@ -172,6 +172,52 @@ export const createComment = async (req, res) => {
 	}
 };
 
+// Nueva función para eliminar comentarios
+export const deleteComment = async (req, res) => {
+	try {
+		const { postId, commentId } = req.params;
+		const userId = req.user._id;
+		const userRole = req.user.role;
+
+		const post = await Post.findById(postId);
+
+		if (!post) {
+			return res.status(404).json({ message: "Post no encontrado" });
+		}
+
+		// Buscar el comentario específico
+		const comment = post.comments.id(commentId);
+
+		if (!comment) {
+			return res.status(404).json({ message: "Comentario no encontrado" });
+		}
+
+		// Permitir eliminar si es el autor del comentario O si es administrador
+		const isCommentAuthor = comment.user.toString() === userId.toString();
+		const isAdmin = userRole === 'administrador';
+
+		if (!isCommentAuthor && !isAdmin) {
+			return res.status(403).json({ message: "No estás autorizado para eliminar este comentario" });
+		}
+
+		// Remover el comentario del array
+		post.comments.pull(commentId);
+		await post.save();
+
+		// Eliminar notificaciones relacionadas con este comentario
+		await Notification.deleteMany({
+			relatedPost: postId,
+			type: "comment",
+			relatedUser: comment.user
+		});
+
+		res.status(200).json({ message: "Comentario eliminado exitosamente" });
+	} catch (error) {
+		console.error("Error in deleteComment controller:", error);
+		res.status(500).json({ message: "Error del servidor" });
+	}
+};
+
 export const likePost = async (req, res) => {
 	try {
 		const postId = req.params.id;
