@@ -305,6 +305,52 @@ export const addCommentToProject = async (req, res) => {
     }
 };
 
+// Delete comment from project
+export const deleteProjectComment = async (req, res) => {
+    try {
+        const { projectId, commentId } = req.params;
+        const userId = req.user._id;
+        const userRole = req.user.role;
+
+        const project = await ProjectPost.findById(projectId);
+
+        if (!project) {
+            return res.status(404).json({ message: "Proyecto no encontrado" });
+        }
+
+        // Buscar el comentario específico
+        const comment = project.comments.id(commentId);
+
+        if (!comment) {
+            return res.status(404).json({ message: "Comentario no encontrado" });
+        }
+
+        // Permitir eliminar si es el autor del comentario O si es administrador
+        const isCommentAuthor = comment.user.toString() === userId.toString();
+        const isAdmin = userRole === 'administrador';
+
+        if (!isCommentAuthor && !isAdmin) {
+            return res.status(403).json({ message: "No estás autorizado para eliminar este comentario" });
+        }
+
+        // Remover el comentario del array
+        project.comments.pull(commentId);
+        await project.save();
+
+        // Eliminar notificaciones relacionadas con este comentario
+        await Notification.deleteMany({
+            relatedProject: projectId,
+            type: "projectComment",
+            relatedUser: comment.user
+        });
+
+        res.status(200).json({ message: "Comentario eliminado exitosamente" });
+    } catch (error) {
+        console.error("Error in deleteProjectComment controller:", error);
+        res.status(500).json({ message: "Error del servidor" });
+    }
+};
+
 // Like project
 export const likeProject = async (req, res) => {
     try {
