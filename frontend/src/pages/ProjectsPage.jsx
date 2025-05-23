@@ -91,6 +91,20 @@ const ProjectsPage = () => {
             toast.error(error.response?.data?.message || "Error al eliminar el proyecto");
         }
     });
+
+    // Delete comment mutation
+    const { mutate: deleteComment } = useMutation({
+        mutationFn: async ({ projectId, commentId }) => {
+            await axiosInstance.delete(`/projects/${projectId}/comment/${commentId}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(["projects", filters]);
+            toast.success("Comentario eliminado exitosamente");
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.message || "Error al eliminar el comentario");
+        }
+    });
     
     // ProjectPost component with like, comment, show interest, and delete functionality
     const ProjectPost = ({ project, isOwner }) => {
@@ -123,6 +137,18 @@ const ProjectsPage = () => {
             
             if (!window.confirm(confirmMessage)) return;
             deleteProject(project._id);
+        };
+
+        const handleDeleteComment = (commentId, commentAuthorName, isCommentOwner) => {
+            let confirmMessage = "¿Estás seguro de que quieres eliminar este comentario?";
+            
+            // Si es admin pero no es el dueño del comentario, mostrar mensaje especial
+            if (isAdmin && !isCommentOwner) {
+                confirmMessage = `¿Estás seguro de que quieres eliminar este comentario de ${commentAuthorName}? Esta acción no se puede deshacer.`;
+            }
+            
+            if (!window.confirm(confirmMessage)) return;
+            deleteComment({ projectId: project._id, commentId });
         };
         
         const { mutate: addComment } = useMutation({
@@ -346,28 +372,57 @@ const ProjectsPage = () => {
                     <div className="mt-4 border-t pt-4">
                         <h4 className="font-semibold mb-2">Comentarios</h4>
                         <div className="space-y-3 max-h-60 overflow-y-auto">
-                            {project.comments.map((comment) => (
-                                <div key={comment._id} className="flex items-start gap-2 p-2 bg-gray-50 rounded">
-                                    <Link to={`/profile/${comment.user.username}`}>
-                                        <img 
-                                            src={comment.user.profilePicture || "/avatar.png"}
-                                            alt={comment.user.name}
-                                            className="w-8 h-8 rounded-full"
-                                        />
-                                    </Link>
-                                    <div>
-                                        <div className="flex items-baseline gap-2">
-                                            <Link to={`/profile/${comment.user.username}`} className="font-semibold text-sm hover:underline">
-                                                {comment.user.name}
-                                            </Link>
-                                            <span className="text-xs text-gray-500">
-                                                {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
-                                            </span>
+                            {project.comments.map((comment) => {
+                                const isCommentOwner = comment.user._id === authUser._id;
+                                const canDeleteComment = isCommentOwner || isAdmin;
+                                
+                                return (
+                                    <div key={comment._id} className="flex items-start gap-2 p-2 bg-gray-50 rounded">
+                                        <Link to={`/profile/${comment.user.username}`}>
+                                            <img 
+                                                src={comment.user.profilePicture || "/avatar.png"}
+                                                alt={comment.user.name}
+                                                className="w-8 h-8 rounded-full"
+                                            />
+                                        </Link>
+                                        <div className="flex-grow">
+                                            <div className="flex items-baseline gap-2 justify-between">
+                                                <div className="flex items-baseline gap-2">
+                                                    <Link to={`/profile/${comment.user.username}`} className="font-semibold text-sm hover:underline">
+                                                        {comment.user.name}
+                                                    </Link>
+                                                    <span className="text-xs text-gray-500">
+                                                        {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                                                    </span>
+                                                </div>
+                                                {canDeleteComment && (
+                                                    <div className="flex items-center">
+                                                        {/* Mostrar icono de escudo si es admin eliminando comentario de otro usuario */}
+                                                        {isAdmin && !isCommentOwner && (
+                                                            <div className="flex items-center mr-1 text-purple-600" title="Eliminación como administrador">
+                                                                <Shield size={12} className="mr-1" />
+                                                                <span className="text-xs">Admin</span>
+                                                            </div>
+                                                        )}
+                                                        <button
+                                                            onClick={() => handleDeleteComment(
+                                                                comment._id, 
+                                                                comment.user.name, 
+                                                                isCommentOwner
+                                                            )}
+                                                            className="text-red-500 hover:text-red-700 p-1"
+                                                            title={isAdmin && !isCommentOwner ? "Eliminar comentario como administrador" : "Eliminar tu comentario"}
+                                                        >
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <p className="text-sm">{comment.content}</p>
                                         </div>
-                                        <p className="text-sm">{comment.content}</p>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}
