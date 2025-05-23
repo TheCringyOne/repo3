@@ -9,6 +9,7 @@ import {
     deleteProject,
     toggleInterestInProject,
     addCommentToProject,
+    deleteProjectComment,
     likeProject
 } from "../controllers/project.controller.js";
 
@@ -34,6 +35,9 @@ router.post("/:id/interest", protectRoute, toggleInterestInProject);
 
 // Add a comment to a project
 router.post("/:id/comment", protectRoute, addCommentToProject);
+
+// Delete a comment from a project
+router.delete("/:projectId/comment/:commentId", protectRoute, deleteProjectComment);
 
 // Like a project
 router.post("/:id/like", protectRoute, likeProject);
