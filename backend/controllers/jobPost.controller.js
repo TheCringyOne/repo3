@@ -1,183 +1,351 @@
-import JobPost from "../models/jobPost.model.js";
+// backend/controllers/project.controller.js
+import cloudinary from "../lib/cloudinary.js";
+import ProjectPost from "../models/projectPost.model.js";
+import Notification from "../models/notification.model.js";
+import mongoose from "mongoose";
 
-// Get all job posts
-export const getJobPosts = async (req, res) => {
-  try {
-    const { status } = req.query;
-    
-    let query = {};
-    
-    // Filter by status if provided
-    if (status) {
-      query.status = status;
-    }
-    
-    const jobPosts = await JobPost.find(query)
-      .populate("author", "name username profilePicture headline")
-      .sort({ createdAt: -1 });
-
-    res.status(200).json(jobPosts);
-  } catch (error) {
-    console.error("Error in getJobPosts controller:", error);
-    res.status(500).json({ message: "Error del servidor" });
-  }
+// Update expired projects helper
+const updateExpiredProjects = async () => {
+    const now = new Date();
+    await ProjectPost.updateMany(
+        { expirationDate: { $lt: now }, status: "active" },
+        { status: "expired" }
+    );
 };
 
-// Create a new job post (admin only)
-export const createJobPost = async (req, res) => {
-  try {
-    const { 
-      title, 
-      company, 
-      location, 
-      description, 
-      requirements, 
-      salary, 
-      contactEmail, 
-      applicationDeadline,
-      jobType 
-    } = req.body;
-
-    if (!title || !company || !location || !description || !jobType) {
-      return res.status(400).json({ message: "Campos obligatorios incompletos" });
+// Get all projects
+export const getProjects = async (req, res) => {
+    try {
+        const { status, interested, created } = req.query;
+        const userId = req.user._id;
+        
+        let query = {};
+        
+        // Filter by status if provided
+        if (status) {
+            query.status = status;
+        }
+        
+        // Filter projects the user is interested in
+        if (interested === "true") {
+            query["interestedUsers.user"] = userId;
+        }
+        
+        // Filter projects created by the user
+        if (created === "true") {
+            query.author = userId;
+        }
+        
+        const projects = await ProjectPost.find(query)
+            .populate("author", "name username profilePicture headline")
+            .populate("comments.user", "name profilePicture")
+            .populate("interestedUsers.user", "name username profilePicture headline")
+            .sort({ createdAt: -1 });
+        
+        // Convert Mongoose documents to plain objects
+        const plainProjects = projects.map(project => project.toObject());
+        
+        res.status(200).json(plainProjects);
+    } catch (error) {
+        console.error("Error in getProjects controller:", error);
+        res.status(500).json({ message: "Server error" });
     }
-
-    const newJobPost = new JobPost({
-      author: req.user._id,
-      title,
-      company,
-      location,
-      description,
-      requirements,
-      salary,
-      contactEmail,
-      applicationDeadline,
-      jobType
-    });
-
-    await newJobPost.save();
-
-    res.status(201).json(newJobPost);
-  } catch (error) {
-    console.error("Error in createJobPost controller:", error);
-    res.status(500).json({ message: "Error del servidor" });
-  }
 };
 
-// Get a single job post by ID
-export const getJobPostById = async (req, res) => {
-  try {
-    const jobPostId = req.params.id;
-    
-    const jobPost = await JobPost.findById(jobPostId)
-      .populate("author", "name username profilePicture headline");
-      
-    if (!jobPost) {
-      return res.status(404).json({ message: "Oferta de trabajo no encontrada" });
+// Create a new project post
+export const createProject = async (req, res) => {
+    try {
+        const { title, content, image, projectRequirements, projectGoals, expirationDays } = req.body;
+        
+        if (!title || !content) {
+            return res.status(400).json({ message: "Title and content are required" });
+        }
+        
+        // Calculate expiration date
+        const expirationDate = new Date();
+        expirationDate.setDate(expirationDate.getDate() + (parseInt(expirationDays) || 30));
+        
+        let newProject;
+        
+        if (image) {
+            const imgResult = await cloudinary.uploader.upload(image);
+            newProject = new ProjectPost({
+                author: req.user._id,
+                title,
+                content,
+                image: imgResult.secure_url,
+                projectRequirements,
+                projectGoals,
+                expirationDate
+            });
+        } else {
+            newProject = new ProjectPost({
+                author: req.user._id,
+                title,
+                content,
+                projectRequirements,
+                projectGoals,
+                expirationDate
+            });
+        }
+        
+        await newProject.save();
+        
+        // Return as plain object
+        res.status(201).json(newProject.toObject());
+    } catch (error) {
+        console.error("Error in createProject controller:", error);
+        res.status(500).json({ message: "Server error" });
     }
-    
-    res.status(200).json(jobPost);
-  } catch (error) {
-    console.error("Error in getJobPostById controller:", error);
-    res.status(500).json({ message: "Error del servidor" });
-  }
 };
 
-// Update job post (admin only)
-export const updateJobPost = async (req, res) => {
-  try {
-    const jobPostId = req.params.id;
-    const updateData = req.body;
-    
-    const jobPost = await JobPost.findById(jobPostId);
-    
-    if (!jobPost) {
-      return res.status(404).json({ message: "Oferta de trabajo no encontrada" });
+// Get project by ID
+export const getProjectById = async (req, res) => {
+    try {
+        const projectId = req.params.id;
+        
+        if (!mongoose.Types.ObjectId.isValid(projectId)) {
+            return res.status(400).json({ message: "Invalid project ID" });
+        }
+        
+        const project = await ProjectPost.findById(projectId)
+            .populate("author", "name username profilePicture headline")
+            .populate("comments.user", "name profilePicture username headline")
+            .populate("interestedUsers.user", "name username profilePicture headline");
+        
+        if (!project) {
+            return res.status(404).json({ message: "Project not found" });
+        }
+        
+        // Return as plain object
+        res.status(200).json(project.toObject());
+    } catch (error) {
+        console.error("Error in getProjectById controller:", error);
+        res.status(500).json({ message: "Server error" });
     }
-    
-    // Only the author can update the job post
-    if (jobPost.author.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "No autorizado para actualizar esta oferta" });
-    }
-    
-    // Update only allowed fields
-    const allowedFields = [
-      'title', 'company', 'location', 'description', 'requirements', 
-      'salary', 'contactEmail', 'applicationDeadline', 'status', 'jobType'
-    ];
-    
-    const filteredData = {};
-    for (const field of allowedFields) {
-      if (updateData[field] !== undefined) {
-        filteredData[field] = updateData[field];
-      }
-    }
-    
-    const updatedJobPost = await JobPost.findByIdAndUpdate(
-      jobPostId,
-      filteredData,
-      { new: true }
-    ).populate("author", "name username profilePicture headline");
-    
-    res.status(200).json(updatedJobPost);
-  } catch (error) {
-    console.error("Error in updateJobPost controller:", error);
-    res.status(500).json({ message: "Error del servidor" });
-  }
 };
 
-// Delete job post (admin only)
-export const deleteJobPost = async (req, res) => {
-  try {
-    const jobPostId = req.params.id;
-    
-    const jobPost = await JobPost.findById(jobPostId);
-    
-    if (!jobPost) {
-      return res.status(404).json({ message: "Oferta de trabajo no encontrada" });
+// Update project
+export const updateProject = async (req, res) => {
+    try {
+        const projectId = req.params.id;
+        const { title, content, projectRequirements, projectGoals, status, expirationDays } = req.body;
+        
+        const project = await ProjectPost.findById(projectId);
+        
+        if (!project) {
+            return res.status(404).json({ message: "Project not found" });
+        }
+        
+        // Only the author can update the project
+        if (project.author.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: "Not authorized to update this project" });
+        }
+        
+        if (title) project.title = title;
+        if (content) project.content = content;
+        if (projectRequirements) project.projectRequirements = projectRequirements;
+        if (projectGoals) project.projectGoals = projectGoals;
+        if (status) project.status = status;
+        
+        if (expirationDays) {
+            const expirationDate = new Date();
+            expirationDate.setDate(expirationDate.getDate() + parseInt(expirationDays));
+            project.expirationDate = expirationDate;
+        }
+        
+        await project.save();
+        
+        // Return as plain object
+        res.status(200).json(project.toObject());
+    } catch (error) {
+        console.error("Error in updateProject controller:", error);
+        res.status(500).json({ message: "Server error" });
     }
-    
-    // Only the author can delete the job post
-    if (jobPost.author.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "No autorizado para eliminar esta oferta" });
-    }
-    
-    await JobPost.findByIdAndDelete(jobPostId);
-    
-    res.status(200).json({ message: "Oferta de trabajo eliminada exitosamente" });
-  } catch (error) {
-    console.error("Error in deleteJobPost controller:", error);
-    res.status(500).json({ message: "Error del servidor" });
-  }
 };
 
-// Change job post status (admin only)
-export const changeJobStatus = async (req, res) => {
-  try {
-    const jobPostId = req.params.id;
-    const { status } = req.body;
-    
-    if (!['active', 'closed', 'expired'].includes(status)) {
-      return res.status(400).json({ message: "Estado no válido" });
+// Delete project
+export const deleteProject = async (req, res) => {
+    try {
+        const projectId = req.params.id;
+        const userId = req.user._id;
+        const userRole = req.user.role;
+        
+        const project = await ProjectPost.findById(projectId);
+        
+        if (!project) {
+            return res.status(404).json({ message: "Proyecto no encontrado" });
+        }
+        
+        // Permitir eliminar si es el autor del proyecto O si es administrador
+        const isAuthor = project.author.toString() === userId.toString();
+        const isAdmin = userRole === 'administrador';
+        
+        if (!isAuthor && !isAdmin) {
+            return res.status(403).json({ message: "No estás autorizado para eliminar este proyecto" });
+        }
+        
+        // Delete image from cloudinary if it exists
+        if (project.image) {
+            try {
+                const publicId = project.image.split('/').pop().split('.')[0];
+                await cloudinary.uploader.destroy(publicId);
+            } catch (cloudinaryError) {
+                console.error("Error deleting image from cloudinary:", cloudinaryError);
+                // Continue with project deletion even if image deletion fails
+            }
+        }
+        
+        // Delete all notifications related to this project
+        await Notification.deleteMany({ relatedProject: projectId });
+        
+        await ProjectPost.findByIdAndDelete(projectId);
+        
+        res.status(200).json({ message: "Proyecto eliminado exitosamente" });
+    } catch (error) {
+        console.error("Error in deleteProject controller:", error);
+        res.status(500).json({ message: "Error del servidor" });
     }
-    
-    const jobPost = await JobPost.findById(jobPostId);
-    
-    if (!jobPost) {
-      return res.status(404).json({ message: "Oferta de trabajo no encontrada" });
+};
+
+// Toggle interest in project
+export const toggleInterestInProject = async (req, res) => {
+    try {
+        const projectId = req.params.id;
+        const userId = req.user._id;
+        
+        const project = await ProjectPost.findById(projectId);
+        
+        if (!project) {
+            return res.status(404).json({ message: "Proyecto no encontrado" });
+        }
+        
+        if (project.status === "expired") {
+            return res.status(400).json({ message: "No puedes mostrar interés en un proyecto expirado" });
+        }
+        
+        const isInterested = project.interestedUsers.some(
+            interest => interest.user.toString() === userId.toString()
+        );
+        
+        if (isInterested) {
+            project.interestedUsers = project.interestedUsers.filter(
+                interest => interest.user.toString() !== userId.toString()
+            );
+        } else {
+            project.interestedUsers.push({ user: userId });
+            
+            // Create notification for project author if it's not the same user
+            if (project.author.toString() !== userId.toString()) {
+                const notification = new Notification({
+                    recipient: project.author,
+                    type: "projectInterest",
+                    relatedUser: userId,
+                    relatedProject: projectId
+                });
+                await notification.save();
+            }
+        }
+        
+        await project.save();
+        
+        res.status(200).json({
+            message: isInterested ? "Interest removed" : "Interest added",
+            project: project.toObject()
+        });
+    } catch (error) {
+        console.error("Error in toggleInterestInProject controller:", error);
+        res.status(500).json({ message: "Error del servidor" });
     }
-    
-    // Only the author can change the job post status
-    if (jobPost.author.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "No autorizado para actualizar esta oferta" });
+};
+
+// Add comment to project
+export const addCommentToProject = async (req, res) => {
+    try {
+        const projectId = req.params.id;
+        const { content } = req.body;
+        
+        if (!content) {
+            return res.status(400).json({ message: "El contenido del comentario es requerido" });
+        }
+        
+        const project = await ProjectPost.findById(projectId);
+        
+        if (!project) {
+            return res.status(404).json({ message: "Proyecto no encontrado" });
+        }
+        
+        if (project.status === "expired") {
+            return res.status(400).json({ message: "No puedes comentar en un proyecto expirado" });
+        }
+        
+        project.comments.push({
+            user: req.user._id,
+            content
+        });
+        
+        await project.save();
+        
+        // Create notification for project author if it's not the same user
+        if (project.author.toString() !== req.user._id.toString()) {
+            const notification = new Notification({
+                recipient: project.author,
+                type: "projectComment",
+                relatedUser: req.user._id,
+                relatedProject: projectId
+            });
+            await notification.save();
+        }
+        
+        // Return as plain object
+        res.status(200).json(project.toObject());
+    } catch (error) {
+        console.error("Error in addCommentToProject controller:", error);
+        res.status(500).json({ message: "Error del servidor" });
     }
-    
-    jobPost.status = status;
-    await jobPost.save();
-    
-    res.status(200).json({ message: "Estado de la oferta actualizado exitosamente", jobPost });
-  } catch (error) {
-    console.error("Error in changeJobStatus controller:", error);
-    res.status(500).json({ message: "Error del servidor" });
-  }
+};
+
+// Like project
+export const likeProject = async (req, res) => {
+    try {
+        const projectId = req.params.id;
+        const userId = req.user._id;
+        
+        const project = await ProjectPost.findById(projectId);
+        
+        if (!project) {
+            return res.status(404).json({ message: "Proyecto no encontrado" });
+        }
+        
+        if (project.status === "expired") {
+            return res.status(400).json({ message: "No puedes dar like a un proyecto expirado" });
+        }
+        
+        const isLiked = project.likes.includes(userId);
+        
+        if (isLiked) {
+            project.likes = project.likes.filter(id => id.toString() !== userId.toString());
+        } else {
+            project.likes.push(userId);
+            
+            // Create notification for project author if it's not the same user
+            if (project.author.toString() !== userId.toString()) {
+                const notification = new Notification({
+                    recipient: project.author,
+                    type: "projectLike",
+                    relatedUser: userId,
+                    relatedProject: projectId
+                });
+                await notification.save();
+            }
+        }
+        
+        await project.save();
+        
+        // Return as plain object
+        res.status(200).json(project.toObject());
+    } catch (error) {
+        console.error("Error in likeProject controller:", error);
+        res.status(500).json({ message: "Error del servidor" });
+    }
 };
