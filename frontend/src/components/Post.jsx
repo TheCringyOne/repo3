@@ -58,6 +58,20 @@ const Post = ({ post }) => {
 		},
 	});
 
+	const { mutate: deleteComment } = useMutation({
+		mutationFn: async (commentId) => {
+			await axiosInstance.delete(`/posts/${post._id}/comment/${commentId}`);
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["posts"] });
+			queryClient.invalidateQueries({ queryKey: ["post", postId] });
+			toast.success("Comentario eliminado exitosamente");
+		},
+		onError: (error) => {
+			toast.error(error.response?.data?.message || "Error al eliminar el comentario");
+		},
+	});
+
 	const { mutate: likePost, isPending: isLikingPost } = useMutation({
 		mutationFn: async () => {
 			await axiosInstance.post(`/posts/${post._id}/like`);
@@ -78,6 +92,18 @@ const Post = ({ post }) => {
 		
 		if (!window.confirm(confirmMessage)) return;
 		deletePost();
+	};
+
+	const handleDeleteComment = (commentId, commentAuthorName, isCommentOwner) => {
+		let confirmMessage = "¿Estás seguro de que quieres eliminar este comentario?";
+		
+		// Si es admin pero no es el dueño del comentario, mostrar mensaje especial
+		if (isAdmin && !isCommentOwner) {
+			confirmMessage = `¿Estás seguro de que quieres eliminar este comentario de ${commentAuthorName}? Esta acción no se puede deshacer.`;
+		}
+		
+		if (!window.confirm(confirmMessage)) return;
+		deleteComment(commentId);
 	};
 
 	const handleLikePost = async () => {
@@ -167,24 +193,53 @@ const Post = ({ post }) => {
 			{showComments && (
 				<div className='px-4 pb-4'>
 					<div className='mb-4 max-h-60 overflow-y-auto'>
-						{comments.map((comment) => (
-							<div key={comment._id} className='mb-2 bg-base-100 p-2 rounded flex items-start'>
-								<img
-									src={comment.user?.profilePicture || "/avatar.png"}
-									alt={comment.user?.name || "Usuario"}
-									className='w-8 h-8 rounded-full mr-2 flex-shrink-0'
-								/>
-								<div className='flex-grow'>
-									<div className='flex items-center mb-1'>
-										<span className='font-semibold mr-2'>{comment.user?.name || "Usuario desconocido"}</span>
-										<span className='text-xs text-info'>
-											{formatDistanceToNow(new Date(comment.createdAt))}
-										</span>
+						{comments.map((comment) => {
+							const isCommentOwner = comment.user?._id === authUser._id;
+							const canDeleteComment = isCommentOwner || isAdmin;
+							
+							return (
+								<div key={comment._id} className='mb-2 bg-base-100 p-2 rounded flex items-start'>
+									<img
+										src={comment.user?.profilePicture || "/avatar.png"}
+										alt={comment.user?.name || "Usuario"}
+										className='w-8 h-8 rounded-full mr-2 flex-shrink-0'
+									/>
+									<div className='flex-grow'>
+										<div className='flex items-center mb-1 justify-between'>
+											<div className='flex items-center'>
+												<span className='font-semibold mr-2'>{comment.user?.name || "Usuario desconocido"}</span>
+												<span className='text-xs text-info'>
+													{formatDistanceToNow(new Date(comment.createdAt))}
+												</span>
+											</div>
+											{canDeleteComment && (
+												<div className="flex items-center">
+													{/* Mostrar icono de escudo si es admin eliminando comentario de otro usuario */}
+													{isAdmin && !isCommentOwner && (
+														<div className="flex items-center mr-1 text-purple-600" title="Eliminación como administrador">
+															<Shield size={12} className="mr-1" />
+															<span className="text-xs">Admin</span>
+														</div>
+													)}
+													<button
+														onClick={() => handleDeleteComment(
+															comment._id, 
+															comment.user?.name || "Usuario", 
+															isCommentOwner
+														)}
+														className="text-red-500 hover:text-red-700 p-1"
+														title={isAdmin && !isCommentOwner ? "Eliminar comentario como administrador" : "Eliminar tu comentario"}
+													>
+														<Trash2 size={12} />
+													</button>
+												</div>
+											)}
+										</div>
+										<p>{comment.content}</p>
 									</div>
-									<p>{comment.content}</p>
 								</div>
-							</div>
-						))}
+							);
+						})}
 					</div>
 
 					<form onSubmit={handleAddComment} className='flex items-center'>
