@@ -3,7 +3,7 @@ name: Build and deploy Node.js app to Azure Web App - plataformaDeEgresados
 on:
   push:
     branches:
-      - main
+        - para-el-server
   workflow_dispatch:
 
 env:
