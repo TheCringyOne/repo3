@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 env:
-  AZURE_WEBAPP_NAME: 'TU-NOMBRE-APP-AQUI'    # 🔴 CAMBIA ESTO
+  AZURE_WEBAPP_NAME: 'plataformaDeEgresados'    # 🔴 CAMBIA ESTO
   AZURE_WEBAPP_PACKAGE_PATH: '.'
   NODE_VERSION: '18.x'
 
