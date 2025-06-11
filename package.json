@@ -6,8 +6,7 @@
 	"scripts": {
 		"dev": "nodemon backend/server.js",
 		"start": "node backend/server.js",
-		"build": "npm install && npm install --prefix frontend --include=dev && cd frontend && npm run build",
-		"postinstall": "npm run build"
+		"build": "npm install && npm install --prefix frontend --include=dev && cd frontend && npm run build"
 	},
 	"engines": {
 		"node": "18.x",
